@@ -1962,21 +1962,40 @@ static void start_new_cluster(t_cluster_placement_stats* cluster_placement_stats
         //This means that the packer will prefer to use types with lower utilization.
         //This is a naive approach to try balancing utilization when multiple types can
         //support the same primitive(s).
-        std::stable_sort(candidate_types.begin(), candidate_types.end(),
-                         [&](t_logical_block_type_ptr lhs, t_logical_block_type_ptr rhs) {
-                             int lhs_num_instances = 0;
-                             int rhs_num_instances = 0;
-                             // Count number of instances for each type
-                             for (auto type : lhs->equivalent_tiles)
-                                 lhs_num_instances += device_ctx.grid.num_instances(type);
-                             for (auto type : rhs->equivalent_tiles)
-                                 rhs_num_instances += device_ctx.grid.num_instances(type);
+	
+	t_logical_block_type_ptr lhs = NULL;
+	t_logical_block_type_ptr rhs = NULL;
+	int lhs_loc = -1;
+	int rhs_loc = -1;
 
-                             float lhs_util = vtr::safe_ratio<float>(num_used_type_instances[lhs], lhs_num_instances);
-                             float rhs_util = vtr::safe_ratio<float>(num_used_type_instances[rhs], rhs_num_instances);
-                             //Lower util first
-                             return lhs_util < rhs_util;
-                         });
+	int c_loc = 0;
+	for(auto& c : candidate_types) {
+	    if ((strcmp(c->name, "BLK-TL-BRAM_L") == 0) || (strcmp(c->name, "BLK-TL-BRAM_R") == 0)) {
+		if(lhs == NULL) {
+		    lhs = c;
+		    lhs_loc = c_loc;
+		} else {
+		    rhs = c;
+		    rhs_loc = c_loc;
+		}
+	    }
+	    c_loc++;
+	}
+	 
+	if (lhs != NULL && rhs != NULL) {
+	     int lhs_num_instances = 0;
+	     int rhs_num_instances = 0;
+	     for (auto type : lhs->equivalent_tiles)
+		 lhs_num_instances += device_ctx.grid.num_instances(type);
+	     for (auto type : rhs->equivalent_tiles)
+		 rhs_num_instances += device_ctx.grid.num_instances(type);
+
+	     float lhs_util = vtr::safe_ratio<float>(num_used_type_instances[lhs], lhs_num_instances);
+	     float rhs_util = vtr::safe_ratio<float>(num_used_type_instances[rhs], rhs_num_instances);
+	     if (lhs_util > rhs_util) {
+		std::iter_swap(candidate_types.begin() + lhs_loc, candidate_types.begin() + rhs_loc);
+	     }
+	}
     }
 
     if (verbosity > 2) {
