@@ -106,6 +106,7 @@ static vtr::vector<ClusterNetId, double> net_cost, proposed_net_cost;
  * bounding box is got from scratch, so the bounding box would definitely be     *
  * right, DO NOT update again.                                                   */
 static vtr::vector<ClusterNetId, char> bb_updated_before;
+static vtr::vector<ClusterNetId, char> bb_updated_before_cost; // flag array for comp_bb_cost
 
 /* [0..cluster_ctx.clb_nlist.nets().size()-1].  Store the bounding box coordinates and the number of    *
  * blocks on each of a net's bounding box (to allow efficient updates),      *
@@ -1796,8 +1797,12 @@ static double comp_bb_cost(e_cost_methods method) {
             if (cluster_ctx.clb_nlist.net_sinks(net_id).size() >= SMALL_NET && method == NORMAL) {
                 get_bb_from_scratch(net_id, &bb_coords[net_id],
                                     &bb_num_on_edges[net_id]);
+                bb_updated_before_cost[net_id] = GOT_FROM_SCRATCH;
             } else {
-                get_non_updateable_bb(net_id, &bb_coords[net_id]);
+                if (bb_updated_before_cost[net_id] == NOT_UPDATED_YET) { // Only once per-net
+                    get_non_updateable_bb(net_id, &bb_coords[net_id]);
+                    bb_updated_before_cost[net_id] = UPDATED_ONCE;
+                }
             }
 
             net_cost[net_id] = get_net_cost(net_id, &bb_coords[net_id]);
@@ -1874,6 +1879,7 @@ static void alloc_and_load_placement_structs(float place_cost_exp,
      * cost has been recomputed. proposed_net_cost[inet] < 0 means net's cost hasn't *
      * been recomputed.                                                          */
     bb_updated_before.resize(num_nets, NOT_UPDATED_YET);
+    bb_updated_before_cost.resize(num_nets, NOT_UPDATED_YET);
 
     alloc_and_load_for_fast_cost_update(place_cost_exp);
 
@@ -1904,6 +1910,7 @@ static void free_placement_structs(const t_placer_opts& placer_opts) {
     vtr::release_memory(bb_num_on_edges);
 
     vtr::release_memory(bb_updated_before);
+    vtr::release_memory(bb_updated_before_cost);
 
     free_fast_cost_update();
 
