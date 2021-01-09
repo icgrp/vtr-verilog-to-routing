@@ -109,7 +109,7 @@ util::Cost_Entry CostMap::find_cost(int from_seg_index, int delta_x, int delta_y
     // This can be due to an absence of samples during the lookahead generation.
     // This check is required to avoid unexpected behavior when querying an empty map.
     if (cost_map.dim_size(0) == 0 || cost_map.dim_size(1) == 0) {
-        return util::Cost_Entry();
+        return util::Cost_Entry(0, 0);
     }
 
     // Delta coordinate with the offset adjusted to fit the segment bounding box
